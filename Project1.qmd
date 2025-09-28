@@ -18,6 +18,11 @@ library(DBI)
 
 
 # Generalized functions
+
+## Summary function
+
+We want to create a function a generic function for summarizing our data. A generic function will return different outputs for different classes given in the input. Our generic function will return weighted means and standard deviations given numeric variables from a tibble, and return counts in a one-way frequency table given categorical variables in from a tibble. We have given default values for our function, so it still returns summaries even when no arguments are given! Our function defaults to using our tibble where we have added `"census"` as a class. The default numeric variables that the function summarizes is every numeric variable except PWGTP (which is our weights), and the default categorical variables used are every categorical variable in our tibble. The values are returned in a list of length 2, with the first object in the list being our numeric summaries and the second object being the categorical summaries.
+
 ```{r}
 # example tibble, to be deleted later
 your_tibble <- tibble(
@@ -27,33 +32,47 @@ your_tibble <- tibble(
 )
 your_tibble
 
-# add census to the classes of our tibble
+# add "census" to the classes of our tibble
 class(your_tibble) <- c("census", class(your_tibble))
 
-num_vars <- your_tibble |> select(where(is.numeric), -PWGTP)
-num_vars
-num_vars |> names()
-colnames(num_vars)
 
-cat_vars <- your_tibble |> select(where(is.factor))
-length(cat_vars)
-
-# create a function to get summary statistics of variable from our census data
+# create a function to get summary statistics of variables from our census data
 summary.census <- function(tibble = your_tibble, 
                            num_vars = names(tibble |> 
                              select(where(is.numeric), -PWGTP)), 
                            cat_vars = names(tibble |> 
                              select(where(is.factor)))){
-  tibble |> 
+  # create the summaries of numeric variables (get their weighted means and standard deviations)
+  num_list <- tibble |> 
     summarize(across(all_of(num_vars),
-            list("mean" = sum(numeric_vector*weight_vector)/sum(weight_vector), 
-                 "sd" = sqrt(sum(numeric_vector^2*weight_vector)/sum(weight_vector)-sample_mean^2)),
+            list("mean" = ~ weighted.mean(.x, w = tibble$PWGTP, na.rm = TRUE), 
+                 "sd" = ~ sqrt(weighted.mean((.x - weighted.mean(.x, tibble$PWGTP))^2, w = tibble$PWGTP))),
             .names = "{.fn}_{.col}"))
-  tibble |> 
+  
+  # create the summaries of categorical variables (get their counts in a one-way table)
+  cat_list <- tibble |> 
   group_by(across(all_of(cat_vars))) |>
   summarize(count = n())
   
+  # return the summaries of both the numeric and character vectors
+  return(list(num_list, cat_list))
 }
 
+# call the summary function with default values
 summary.census()
+```
+
+## Plot function
+
+We also want to create a generic function for plotting our variables, specifically a box plot of a numeric variable grouped by a categorical variable. Our default data set is again the tibble with `"census"` as a class, but we have no default variables, so the user must specify them when calling the function. The tibble, numeric variable (titled `num_var` where we define our function), and categorical variable (titled `cat_var`) are the three arguments in our function. Once again, our numeric variable is being weighted, still by the `PWGTP` variable. The function will produce side-by-side box plots, with the number of box plots produced being the number of of levels to our categorical variable.
+
+```{r}
+# create a function to plot a categorical and numeric variable from our data in boxplots
+plot.census <- function(tibble = your_tibble, num_var, cat_var){
+ggplot(tibble, aes(x = get(cat_var), y = get(num_var), weight = PWGTP)) +
+geom_boxplot()
+}
+
+# call the generic plotting function using AGEP as a numeric and SEX as a categorical
+plot.census(num_var = "AGEP", cat_var = "SEX")
 ```
