@@ -25,12 +25,35 @@ your_tibble <- tibble(
   AGEP = c(25, 30, 76, 41, 55),
   PWGTP = c(162, 128, 171, 223, 193)
 )
+your_tibble
 
 # add census to the classes of our tibble
 class(your_tibble) <- c("census", class(your_tibble))
 
+num_vars <- your_tibble |> select(where(is.numeric), -PWGTP)
+num_vars
+num_vars |> names()
+colnames(num_vars)
+
+cat_vars <- your_tibble |> select(where(is.factor))
+length(cat_vars)
+
 # create a function to get summary statistics of variable from our census data
-summary.census <- function(tibble = your_tibble, num_vars = , cat_vars = ){
+summary.census <- function(tibble = your_tibble, 
+                           num_vars = names(tibble |> 
+                             select(where(is.numeric), -PWGTP)), 
+                           cat_vars = names(tibble |> 
+                             select(where(is.factor)))){
+  tibble |> 
+    summarize(across(all_of(num_vars),
+            list("mean" = sum(numeric_vector*weight_vector)/sum(weight_vector), 
+                 "sd" = sqrt(sum(numeric_vector^2*weight_vector)/sum(weight_vector)-sample_mean^2)),
+            .names = "{.fn}_{.col}"))
+  tibble |> 
+  group_by(across(all_of(cat_vars))) |>
+  summarize(count = n())
   
 }
+
+summary.census()
 ```
