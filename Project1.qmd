@@ -4,4 +4,18 @@ author: "Nathan Honea and Ramya Konduru"
 format: html
 ---
 
-# Start Here!
+```{r setup code chunk}
+library(tidyverse)
+library(DBI)
+```
+
+# Read in Data from API
+```{r}
+
+```
+
+
+# Generalized functions
+```{r}
+
+```
