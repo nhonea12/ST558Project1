@@ -2,6 +2,8 @@
 title: "ST 558 Project 1"
 author: "Nathan Honea and Ramya Konduru"
 format: html
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup code chunk}
@@ -17,5 +19,18 @@ library(DBI)
 
 # Generalized functions
 ```{r}
+# example tibble, to be deleted later
+your_tibble <- tibble(
+  SEX = as.factor(c(1, 2, 2, 1, 1)), 
+  AGEP = c(25, 30, 76, 41, 55),
+  PWGTP = c(162, 128, 171, 223, 193)
+)
 
+# add census to the classes of our tibble
+class(your_tibble) <- c("census", class(your_tibble))
+
+# create a function to get summary statistics of variable from our census data
+summary.census <- function(tibble = your_tibble, num_vars = , cat_vars = ){
+  
+}
 ```
