@@ -21,12 +21,10 @@ library(httr)
 library(jsonlite)
 library(dplyr)
 
-# Main function to pull data from Census PUMS API
 get_census_data <- function(year = 2022,
                             num_vars = c("AGEP", "PWGTP"), 
                             cat_vars = c("SEX"),
-                            geography = "All", 
-                            state = NULL) {
+                            state = "17") {   # default: Illinois (Group 17)
   
   if (year < 2010 | year > 2022) {
     stop("Year must be between 2010 and 2022")
@@ -38,11 +36,9 @@ get_census_data <- function(year = 2022,
   
   base_url <- sprintf("https://api.census.gov/data/%s/acs/acs1/pums", year)
   vars <- paste(c(num_vars, cat_vars), collapse = ",")
-  query <- list(get = vars)
   
-  if (!is.null(state)) {
-    query$STATE <- state
-  }
+  # Build query properly
+  query <- list(get = vars, `for` = paste0("state:", state))
   
   res <- GET(base_url, query = query)
   stop_for_status(res)
