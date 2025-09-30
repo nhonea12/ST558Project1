@@ -169,7 +169,7 @@ head(multi_test)
 ```
 The multi-year function successfully combines census data for several years into one dataset, while keeping all the same cleaning steps and structure as our single-year function. By including a year column, it is easy to summarize or plot values over time, which gives us the flexibility to explore changes and patterns across different survey years.
 
-#Example Analysis
+# Example Analysis
 We pulled census data for multiple years from State 17 (Illinois) and analyzed the sex distribution of the population within the working-age group. By representing these counts both numerically and with bar graphs, we can clearly see the balance between men and women. This type of analysis can be useful for understanding demographic composition, and it highlights how the data could inform decisions such as workforce planning, community programs, or even policy discussions.
 
 ## Analysis: Working-Age Population by Sex
