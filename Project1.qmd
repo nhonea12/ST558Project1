@@ -123,3 +123,83 @@ plot(test, num_var = "AGEP", cat_var = "SEX")
 
 ```
 This function gives a quick visual comparison of the numeric variable across groups of the categorical variable. For example, plotting AGEP by SEX shows the distribution of ages for males and females in our subset of the Census data.
+
+#Multi-year functions
+We also created an extension of our API function that allows us to pull data for multiple years at once. This wrapper function, called get_census_multi(), loops through each requested year, calls our single-year API function, and then combines the results into one tibble. A new column "year" is added so we can easily compare results across time. This makes it possible to analyze trends instead of just a single snapshot.
+
+```{r}
+get_census_multi <- function(years = c(2021, 2022),
+                             num_vars = c("AGEP", "PWGTP"),
+                             cat_vars = c("SEX"),
+                             state = "17") {
+  
+  valid_years <- years[years >= 2017 & years <= 2022]  # safer range
+  
+  data_list <- list()
+  
+  for (y in valid_years) {
+    message("Pulling data for year: ", y)
+    tryCatch({
+      df <- get_census_data(year = y,
+                            num_vars = num_vars,
+                            cat_vars = cat_vars,
+                            state = state)
+      df$year <- y
+      data_list[[as.character(y)]] <- df
+    }, error = function(e) {
+      message("Skipping year ", y, ": ", e$message)
+    })
+  }
+  
+  if (length(data_list) == 0) {
+    stop("No valid data returned for requested years")
+  }
+  
+  combined <- dplyr::bind_rows(data_list)
+  class(combined) <- c("census", class(combined))
+  return(combined)
+}
+
+# Example usage
+multi_test <- get_census_multi(years = c(2019, 2021, 2022))
+cat("Pulled multi-year census data with", nrow(multi_test), "rows\n")
+head(multi_test)
+```
+The multi-year function successfully combines census data for several years into one dataset, while keeping all the same cleaning steps and structure as our single-year function. By including a year column, it is easy to summarize or plot values over time, which gives us the flexibility to explore changes and patterns across different survey years.
+
+#Example Analysis
+We pulled census data for multiple years from State 17 (Illinois) and analyzed the sex distribution of the population within the working-age group. By representing these counts both numerically and with bar graphs, we can clearly see the balance between men and women. This type of analysis can be useful for understanding demographic composition, and it highlights how the data could inform decisions such as workforce planning, community programs, or even policy discussions.
+
+## Analysis: Working-Age Population by Sex
+
+Our analysis question is to compare the number of men and women in the working-age population. We defined the working population as individuals between the ages of 18 and 64. Using our weighted census data, we calculated the population estimates for men and women in this age group. 
+
+```{r}
+# Filter for working-age individuals
+working_age <- test %>%
+  filter(AGEP >= 18, AGEP <= 64)
+
+# Weighted counts by sex
+working_summary <- working_age %>%
+  group_by(SEX) %>%
+  summarize(weighted_count = sum(PWGTP, na.rm = TRUE),
+            .groups = "drop")
+
+working_summary
+```
+
+Our analysis of the working-age population (ages 18–64) shows that Illinois has approximately 3.88 million men and 3.83 million women in this age range. The male working-age population is slightly higher, though both groups are close in size. This demonstrates how our functions can be used to explore demographic patterns within specific subsets of the census data.
+
+# Bar chart for working population by sex
+
+To better visualize the results, we created a bar chart comparing the weighted counts of men and women in the working-age population (ages 18–64). This allows us to quickly see which group is larger and by how much.
+
+```{r}
+ggplot(working_summary, aes(x = SEX, y = weighted_count, fill = SEX)) +
+  geom_col() +
+  labs(title = "Weighted Working-Age Population (18–64) by Sex in Illinois",
+       x = "Sex (1 = Male, 2 = Female)",
+       y = "Weighted Count") +
+  theme_minimal()
+```
+The bar chart shows that the working-age male population is slightly larger than the working-age female population in Illinois. However, the difference is relatively small, suggesting that the working-age population is fairly balanced between men and women.
