@@ -140,6 +140,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
+<p>In this project, we built custom R functions to pull and analyze census data from the American Community Survey (ACS) Public Use Microdata Sample (PUMS). We created a function to access the Census API, generic methods for summarizing and plotting the data, and a wrapper function to compare multiple years. Finally, we applied these functions to explore the working-age population of Illinois.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stderr">
@@ -225,12 +226,12 @@ Attaching package: 'jsonlite'</code></pre>
 <pre><code># A tibble: 6 × 4
    AGEP PWGTP SEX   state
   &lt;dbl&gt; &lt;dbl&gt; &lt;fct&gt; &lt;chr&gt;
-1    62    98 2     17   
-2    40   196 1     17   
-3    53    50 2     17   
-4    67    50 2     17   
-5    37   158 2     17   
-6    37   148 1     17   </code></pre>
+1    82    32 2     17   
+2    43    91 1     17   
+3    18    45 2     17   
+4    49    38 1     17   
+5    42     8 1     17   
+6    83     7 1     17   </code></pre>
 </div>
 </div>
 <p>The function essentially connects to the census data through API calls, tests the connection and return “Pulled Census data with _ rows” with the number of data rows pulled. It is also important to note that we are only pulling in data from <strong>State 17</strong> as we are group 17.</p>
@@ -316,7 +317,10 @@ Attaching package: 'jsonlite'</code></pre>
 </div>
 </div>
 <p>This function gives a quick visual comparison of the numeric variable across groups of the categorical variable. For example, plotting AGEP by SEX shows the distribution of ages for males and females in our subset of the Census data.</p>
-<p>#Multi-year functions We also created an extension of our API function that allows us to pull data for multiple years at once. This wrapper function, called get_census_multi(), loops through each requested year, calls our single-year API function, and then combines the results into one tibble. A new column “year” is added so we can easily compare results across time. This makes it possible to analyze trends instead of just a single snapshot.</p>
+</section>
+<section id="multi-year-functions" class="level2">
+<h2 class="anchored" data-anchor-id="multi-year-functions">Multi-year Functions</h2>
+<p>We also created an extension of our API function that allows us to pull data for multiple years at once. This wrapper function, called get_census_multi(), loops through each requested year, calls our single-year API function, and then combines the results into one tibble. A new column “year” is added so we can easily compare results across time. This makes it possible to analyze trends instead of just a single snapshot.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>get_census_multi <span class="ot">&lt;-</span> <span class="cf">function</span>(<span class="at">years =</span> <span class="fu">c</span>(<span class="dv">2021</span>, <span class="dv">2022</span>),</span>
 <span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>                             <span class="at">num_vars =</span> <span class="fu">c</span>(<span class="st">"AGEP"</span>, <span class="st">"PWGTP"</span>),</span>

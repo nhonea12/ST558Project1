@@ -6,6 +6,8 @@ editor_options:
   chunk_output_type: console
 ---
 
+In this project, we built custom R functions to pull and analyze census data from the American Community Survey (ACS) Public Use Microdata Sample (PUMS). We created a function to access the Census API, generic methods for summarizing and plotting the data, and a wrapper function to compare multiple years. Finally, we applied these functions to explore the working-age population of Illinois.
+
 ```{r setup code chunk}
 library(tidyverse)
 library(DBI)
@@ -124,7 +126,7 @@ plot(test, num_var = "AGEP", cat_var = "SEX")
 ```
 This function gives a quick visual comparison of the numeric variable across groups of the categorical variable. For example, plotting AGEP by SEX shows the distribution of ages for males and females in our subset of the Census data.
 
-#Multi-year functions
+## Multi-year Functions
 We also created an extension of our API function that allows us to pull data for multiple years at once. This wrapper function, called get_census_multi(), loops through each requested year, calls our single-year API function, and then combines the results into one tibble. A new column "year" is added so we can easily compare results across time. This makes it possible to analyze trends instead of just a single snapshot.
 
 ```{r}
