@@ -78,7 +78,7 @@ The function essentially connects to the census data through API calls, tests th
 We want to create a function a generic function for summarizing our data. A generic function will return different outputs for different classes given in the input. Our generic function will return weighted means and standard deviations given numeric variables from a tibble, and return counts in a one-way frequency table given categorical variables in from a tibble. We have given default values for our function, so it still returns summaries even when no arguments are given! Our function defaults to using our tibble where we have added `"census"` as a class. The default numeric variables that the function summarizes is every numeric variable except PWGTP (which is our weights), and the default categorical variables used are every categorical variable in our tibble. The values are returned in a list of length 2, with the first object in the list being our numeric summaries and the second object being the categorical summaries.
 
 ```{r}
-# create a function to get weighted summary statistics of variables from our census data, with the PWGTP variable being our weight
+# create a function to get summary statistics of variables from our census data
 summary.census <- function(tibble = test, 
                            num_vars = names(tibble |> 
                              select(where(is.numeric), -PWGTP)), 
@@ -94,7 +94,7 @@ summary.census <- function(tibble = test,
   
   cat_list <- tibble |> 
     group_by(across(all_of(cat_vars))) |>
-    summarize(weighted_count = sum(PWGTP))
+    summarize(count = n())
   
   return(list(num_list, cat_list))
 }
