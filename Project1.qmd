@@ -11,6 +11,10 @@ In this project, we built custom R functions to pull and analyze census data fro
 ```{r setup code chunk}
 library(tidyverse)
 library(DBI)
+library(httr)
+library(jsonlite)
+library(dplyr)
+library(lubridate)
 ```
 
 # Read in Data from API
@@ -19,28 +23,40 @@ We want to create a function that will pull real data directly from the Census B
 
 
 ```{r}
-library(httr)
-library(jsonlite)
-library(dplyr)
 
 get_census_data <- function(year = 2022,
                             num_vars = c("AGEP", "PWGTP"), 
                             cat_vars = c("SEX"),
-                            state = "17") {   # default: Illinois (Group 17)
+                            geo_level = "state", # default to look at a specific state
+                            geo_code = "17") {   # default: Illinois (Group 17)
   
   if (year < 2010 | year > 2022) {
     stop("Year must be between 2010 and 2022")
   }
   
+  # if PWGTP (our weighting variable) was not included in num_vars, add it
   if (!"PWGTP" %in% num_vars) {
     num_vars <- c(num_vars, "PWGTP")
+  }
+  
+  # ensure the numeric variables defined by the user are among the options allowed in the project
+  for (i in num_vars) {
+    if (!(i %in% c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP"))) {
+    stop(paste0("Numeric variable not supported: ", i))
+  }
+  }
+  # ensure the categorical variables defined by the user are among the options allowed in the project
+  for (i in cat_vars) {
+    if (!(i %in% c("FER", "HHL", "HISPEED", "JWTRNS", "SCH", "SCHL", "SEX"))) {
+    stop(paste0("Categorical variable not supported: ", i))
+  }
   }
   
   base_url <- sprintf("https://api.census.gov/data/%s/acs/acs1/pums", year)
   vars <- paste(c(num_vars, cat_vars), collapse = ",")
   
   # Build query properly
-  query <- list(get = vars, `for` = paste0("state:", state))
+  query <- list(get = vars, `for` = paste0(geo_level,":", geo_code))
   
   res <- GET(base_url, query = query)
   stop_for_status(res)
@@ -50,15 +66,26 @@ get_census_data <- function(year = 2022,
   df <- as.data.frame(dat[-1, ], stringsAsFactors = FALSE)
   names(df) <- dat[1, ]
   
+  # convert num_vars to numeric, except JWAP and JWDP, which should be converted to time variables; done here with the lubridate function and if/then/else logic
   for (v in num_vars) {
-    df[[v]] <- as.numeric(df[[v]])
+    #if(v %in% c("JWAP", "JWDP")) {
+    #  stringr::str_split(df[[v]], " to ") |> 
+        
+     #      df[[v]] <- hm(df[[v]])
+      #     } else {
+           df[[v]] <- as.numeric(df[[v]])
+       #    }
   }
   
+  # convert cat_vars to factors
   for (v in cat_vars) {
     df[[v]] <- as.factor(df[[v]])
   }
   
+  # convert our data frame to a tibble
   df <- tibble::as_tibble(df)
+  
+  # add census as one of the classes of df
   class(df) <- c("census", class(df))
   
   return(df)
@@ -133,7 +160,8 @@ We also created an extension of our API function that allows us to pull data for
 get_census_multi <- function(years = c(2021, 2022),
                              num_vars = c("AGEP", "PWGTP"),
                              cat_vars = c("SEX"),
-                             state = "17") {
+                             geo_level = "state",
+                             geo_code = "17") {
   
   valid_years <- years[years >= 2017 & years <= 2022]  # safer range
   
@@ -145,7 +173,8 @@ get_census_multi <- function(years = c(2021, 2022),
       df <- get_census_data(year = y,
                             num_vars = num_vars,
                             cat_vars = cat_vars,
-                            state = state)
+                            geo_level = geo_level,
+                            geo_code = geo_code)
       df$year <- y
       data_list[[as.character(y)]] <- df
     }, error = function(e) {
