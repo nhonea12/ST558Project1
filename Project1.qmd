@@ -14,7 +14,8 @@ library(DBI)
 library(httr)
 library(jsonlite)
 library(dplyr)
-library(lubridate)
+library(hms)      # for time variables like JWAP/JWDP
+
 ```
 
 # Read in Data from API
@@ -23,78 +24,126 @@ We want to create a function that will pull real data directly from the Census B
 
 
 ```{r}
+library(httr)
+library(jsonlite)
+library(dplyr)
+library(stringr)
+library(hms)   # for proper time type
 
 get_census_data <- function(year = 2022,
                             num_vars = c("AGEP", "PWGTP"), 
                             cat_vars = c("SEX"),
-                            geo_level = "state", # default to look at a specific state
-                            geo_code = "17") {   # default: Illinois (Group 17)
+                            geo_level = "state", 
+                            geo_code = "17") {
   
+  # Year check
   if (year < 2010 | year > 2022) {
     stop("Year must be between 2010 and 2022")
   }
   
-  # if PWGTP (our weighting variable) was not included in num_vars, add it
+  # Ensure PWGTP is included
   if (!"PWGTP" %in% num_vars) {
     num_vars <- c(num_vars, "PWGTP")
   }
   
-  # ensure the numeric variables defined by the user are among the options allowed in the project
+  # Allowed variables
+  allowed_num <- c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP")
+  allowed_cat <- c("FER", "HHL", "HISPEED", "JWTRNS", "SCH", "SCHL", "SEX")
+  
+  # Validate numeric vars
   for (i in num_vars) {
-    if (!(i %in% c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP"))) {
-    stop(paste0("Numeric variable not supported: ", i))
+    if (!(i %in% allowed_num)) {
+      stop(paste0("Numeric variable not supported: ", i))
+    }
   }
-  }
-  # ensure the categorical variables defined by the user are among the options allowed in the project
+  
+  # Validate categorical vars
   for (i in cat_vars) {
-    if (!(i %in% c("FER", "HHL", "HISPEED", "JWTRNS", "SCH", "SCHL", "SEX"))) {
-    stop(paste0("Categorical variable not supported: ", i))
-  }
+    if (!(i %in% allowed_cat)) {
+      stop(paste0("Categorical variable not supported: ", i))
+    }
   }
   
+  # Geography handling
+  if (!(geo_level %in% c("all", "region", "division", "state"))) {
+    stop("geo_level must be one of: all, region, division, state")
+  }
+  
+  geo_query <- switch(
+    geo_level,
+    "all"      = list(get = paste(c(num_vars, cat_vars), collapse = ","), `for` = "us:1"),
+    "region"   = list(get = paste(c(num_vars, cat_vars), collapse = ","), `for` = paste0("region:", geo_code)),
+    "division" = list(get = paste(c(num_vars, cat_vars), collapse = ","), `for` = paste0("division:", geo_code)),
+    "state"    = list(get = paste(c(num_vars, cat_vars), collapse = ","), `for` = paste0("state:", geo_code))
+  )
+  
+  # API call
   base_url <- sprintf("https://api.census.gov/data/%s/acs/acs1/pums", year)
-  vars <- paste(c(num_vars, cat_vars), collapse = ",")
-  
-  # Build query properly
-  query <- list(get = vars, `for` = paste0(geo_level,":", geo_code))
-  
-  res <- GET(base_url, query = query)
+  res <- GET(base_url, query = geo_query)
   stop_for_status(res)
   
   dat <- fromJSON(content(res, "text"))
-  
   df <- as.data.frame(dat[-1, ], stringsAsFactors = FALSE)
   names(df) <- dat[1, ]
   
-  # convert num_vars to numeric, except JWAP and JWDP, which should be converted to time variables; done here with the lubridate function and if/then/else logic
+  # Convert numerics
   for (v in num_vars) {
-    #if(v %in% c("JWAP", "JWDP")) {
-    #  stringr::str_split(df[[v]], " to ") |> 
-        
-     #      df[[v]] <- hm(df[[v]])
-      #     } else {
-           df[[v]] <- as.numeric(df[[v]])
-       #    }
+    if (v %in% c("JWAP", "JWDP")) {
+      # Parse commute times (midpoint)
+      df[[v]] <- suppressWarnings(as.numeric(df[[v]]))
+      df[[v]][df[[v]] == 0] <- NA  # treat 0 as NA
+      df[[v]] <- ifelse(!is.na(df[[v]]), df[[v]] * 1, NA)  # minutes after midnight
+      df[[v]] <- hms::as_hms(df[[v]] * 60)  # convert minutes → time
+    } else {
+      df[[v]] <- as.numeric(df[[v]])
+    }
   }
   
-  # convert cat_vars to factors
+  # Convert categoricals
   for (v in cat_vars) {
     df[[v]] <- as.factor(df[[v]])
+    
+    if (v == "SEX") {
+      df[[v]] <- factor(df[[v]], levels = c("1", "2"), labels = c("Male", "Female"))
+    }
+    if (v == "HISPEED") {
+      df[[v]] <- factor(df[[v]], levels = c("0", "1"), labels = c("No Internet", "Has Internet"))
+    }
+    if (v == "SCHL") {
+      df[[v]] <- factor(df[[v]], labels = paste("Level", levels(df[[v]])))
+    }
   }
   
-  # convert our data frame to a tibble
+  # Convert to tibble
   df <- tibble::as_tibble(df)
-  
-  # add census as one of the classes of df
   class(df) <- c("census", class(df))
   
   return(df)
 }
 
-# Pull the data
-test <- get_census_data()
+# Single year, Illinois
+test <- get_census_data(year = 2021,
+                        num_vars = c("AGEP", "PWGTP", "JWAP", "JWDP", "JWMNP"),
+                        cat_vars = c("SEX", "HISPEED"),
+                        geo_level = "state",
+                        geo_code = "17")
+
 cat("Pulled census data with", nrow(test), "rows\n")
 head(test)
+
+# Look at distribution of commute minutes
+summary(test$JWMNP)
+
+# How many people have nonzero commute minutes?
+sum(test$JWMNP > 0, na.rm = TRUE)
+
+# Peek at some actual commuters
+test %>%
+  filter(JWMNP > 0) %>%
+  select(AGEP, SEX, JWMNP, JWAP, JWDP) %>%
+  head(10)
+
+
 
 ```
 
@@ -128,6 +177,16 @@ summary.census <- function(tibble = test,
   return(list(num_list, cat_list))
 }
 
+# Average commute time for workers
+commute_summary <- test %>%
+  filter(JWMNP > 0) %>%
+  group_by(SEX) %>%
+  summarize(mean_commute = weighted.mean(JWMNP, w = PWGTP, na.rm = TRUE),
+            .groups = "drop")
+
+commute_summary
+
+
 # Run summary
 summary(test)
 summary.census()
@@ -147,9 +206,6 @@ plot.census <- function(tibble = test, num_var, cat_var){
     geom_boxplot()
 }
 
-# Example plot
-plot(test, num_var = "AGEP", cat_var = "SEX")
-
 ```
 This function gives a quick visual comparison of the numeric variable across groups of the categorical variable. For example, plotting AGEP by SEX shows the distribution of ages for males and females in our subset of the Census data.
 
@@ -163,7 +219,11 @@ get_census_multi <- function(years = c(2021, 2022),
                              geo_level = "state",
                              geo_code = "17") {
   
-  valid_years <- years[years >= 2017 & years <= 2022]  # safer range
+  # Check valid year range
+  valid_years <- years[years >= 2010 & years <= 2022]
+  if (length(valid_years) == 0) {
+    stop("No valid years specified. Must be between 2010 and 2022.")
+  }
   
   data_list <- list()
   
@@ -183,13 +243,14 @@ get_census_multi <- function(years = c(2021, 2022),
   }
   
   if (length(data_list) == 0) {
-    stop("No valid data returned for requested years")
+    stop("No valid data returned for requested years.")
   }
   
   combined <- dplyr::bind_rows(data_list)
   class(combined) <- c("census", class(combined))
   return(combined)
 }
+
 
 # Example usage
 multi_test <- get_census_multi(years = c(2019, 2021, 2022))
