@@ -163,16 +163,17 @@ summary.census <- function(tibble = test,
                            cat_vars = names(tibble |> 
                              select(where(is.factor)))){
   
+  # create a named list of summaries for the specified numeric variables
   num_list <- tibble |> 
     summarize(across(all_of(num_vars),
-            list("mean" = ~ weighted.mean(.x, w = tibble$PWGTP, na.rm = TRUE), 
-                 "sd"   = ~ sqrt(weighted.mean((.x - weighted.mean(.x, tibble$PWGTP))^2, 
-                                              w = tibble$PWGTP))),
-            .names = "{.fn}_{.col}"))
+            list("mean" = ~ weighted.mean(.x, w = tibble$PWGTP, na.rm = TRUE), # compute the weighted mean
+                 "sd"   = ~ sqrt(weighted.mean((.x - weighted.mean(.x, tibble$PWGTP))^2, w = tibble$PWGTP))), # compute the weighted standard deviation
+            .names = "{.fn}_{.col}")) # name the summaries
   
+  # create a contingency table summarizing the frequencies of specified categorical variables (weighted by PWGTP)
   cat_list <- tibble |> 
     group_by(across(all_of(cat_vars))) |>
-    summarize(count = n())
+    summarize(count = sum(PWGTP, na.rm = TRUE))
   
   return(list(num_list, cat_list))
 }
@@ -200,11 +201,14 @@ This function provides weighted descriptive statistics for the numeric variables
 We also want to create a generic function for plotting our variables, specifically a box plot of a numeric variable grouped by a categorical variable. Our default data set is again the tibble with `"census"` as a class, but we have no default variables, so the user must specify them when calling the function. The tibble, numeric variable (titled `num_var` where we define our function), and categorical variable (titled `cat_var`) are the three arguments in our function. Once again, our numeric variable is being weighted, still by the `PWGTP` variable. The function will produce side-by-side box plots, with the number of box plots produced being the number of of levels to our categorical variable.
 
 ```{r}
-
+# create a generic plot function the produces a side-by-side box plot measuring numeric variables at different levels of a categorical variable
 plot.census <- function(tibble = test, num_var, cat_var){
   ggplot(tibble, aes(x = get(cat_var), y = get(num_var), weight = PWGTP)) +
-    geom_boxplot()
+    geom_boxplot() # add this layer to create a side-by-side box plot
 }
+
+# test the plot with age grouped by sex (male or female)
+plot(test, num_var = "AGEP", cat_var = "SEX")
 
 ```
 This function gives a quick visual comparison of the numeric variable across groups of the categorical variable. For example, plotting AGEP by SEX shows the distribution of ages for males and females in our subset of the Census data.
